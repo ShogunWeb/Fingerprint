@@ -93,7 +93,7 @@ header('Cache-Control: no-store');
   <pre id="http"><?= htmlspecialchars(j($http), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></pre>
 
   <h2 data-i18n="js_section">Depuis JavaScript (côté navigateur)</h2>
-  <pre id="js" data-i18n="collecting_placeholder">(collecte en cours…)</pre>
+  <pre id="js">(collecte en cours…)</pre>
 
 <script src="app.js"></script>
 </body>

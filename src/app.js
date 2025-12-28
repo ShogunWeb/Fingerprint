@@ -34,6 +34,11 @@ function applyTranslations(lang) {
   localStorage.setItem('ui_lang', lang);
   const select = document.getElementById('lang');
   if (select && select.value !== lang) select.value = lang;
+
+  const jsPre = document.getElementById('js');
+  if (jsPre && !jsPre.dataset.collected) {
+    jsPre.textContent = dict.collecting_placeholder;
+  }
 }
 
 // WebGL renderer info can reveal GPU model and driver details.
@@ -131,7 +136,10 @@ async function collectAll() {
 // Collect immediately on page load.
 async function runCollection() {
   const data = await collectAll();
-  document.getElementById('js').textContent = JSON.stringify(data, null, 2);
+  const jsPre = document.getElementById('js');
+  if (!jsPre) return;
+  jsPre.dataset.collected = 'true';
+  jsPre.textContent = JSON.stringify(data, null, 2);
 }
 
 // Initialize UI language from browser or stored choice.
