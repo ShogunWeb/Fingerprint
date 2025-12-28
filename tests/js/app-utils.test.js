@@ -1,10 +1,12 @@
-const { describe, it, expect } = require('vitest');
+import { describe, it, expect } from 'vitest';
+import appUtils from '../../src/app-utils.js';
+
 const {
   parseAcceptLanguageHeader,
   compareLanguageLists,
   buildOsmUrl,
   inferDeviceClass
-} = require('../../src/app-utils');
+} = appUtils;
 
 describe('app-utils', () => {
   it('parses Accept-Language and de-dupes', () => {
