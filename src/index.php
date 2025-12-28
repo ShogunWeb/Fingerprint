@@ -314,6 +314,7 @@ header('Cache-Control: no-store');
 
 <script src="app-utils.js"></script>
 <script src="device-presets.js"></script>
+<script src="i18n.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
