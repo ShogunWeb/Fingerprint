@@ -459,6 +459,7 @@ header('Cache-Control: no-store');
     <div class="card">
       <div class="card-title" data-i18n="js_screen">Écran</div>
       <div id="js-screen" class="card-value"><span class="muted" data-i18n="collecting_placeholder">(collecte en cours...)</span></div>
+      <div id="js-device" class="card-hint"></div>
     </div>
   </div>
   <details class="accordion">
@@ -466,6 +467,7 @@ header('Cache-Control: no-store');
     <pre id="js">(collecte en cours…)</pre>
   </details>
 
+<script src="device-presets.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

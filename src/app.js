@@ -58,7 +58,9 @@ const i18n = {
     js_screen_dpr_label: 'DPR',
     js_screen_color_label: 'Profondeur couleur',
     js_screen_touch_label: 'Points tactiles',
-    js_screen_dpr_help: 'DPR = ratio entre pixels physiques et CSS.'
+    js_screen_dpr_help: 'DPR = ratio entre pixels physiques et CSS.',
+    js_device_hint: 'Type d’appareil probable',
+    js_device_unknown: 'Inconnu'
   },
   en: {
     title: 'Information visible about you',
@@ -118,7 +120,9 @@ const i18n = {
     js_screen_dpr_label: 'DPR',
     js_screen_color_label: 'Color depth',
     js_screen_touch_label: 'Touch points',
-    js_screen_dpr_help: 'DPR = ratio of physical to CSS pixels.'
+    js_screen_dpr_help: 'DPR = ratio of physical to CSS pixels.',
+    js_device_hint: 'Likely device class',
+    js_device_unknown: 'Unknown'
   }
 };
 
@@ -334,6 +338,33 @@ function updateLanguageMatchLabel(dict) {
   el.classList.add(`status-${state}`);
 }
 
+// Infer a device class based on CSS size and DPR against reference presets.
+function inferDeviceClass(size, dpr) {
+  if (!size || !window.DEVICE_PRESETS) return null;
+  const [w, h] = size.split('×').map((v) => Number(v));
+  if (!w || !h) return null;
+  const sw = Math.min(w, h);
+  const sh = Math.max(w, h);
+  const tolerance = 20;
+
+  let best = null;
+  let bestScore = Infinity;
+  window.DEVICE_PRESETS.forEach((preset) => {
+    const pw = Math.min(preset.width, preset.height);
+    const ph = Math.max(preset.width, preset.height);
+    const sizeDelta = Math.abs(sw - pw) + Math.abs(sh - ph);
+    const dprMatch = dpr >= preset.dprMin && dpr <= preset.dprMax;
+    if (sizeDelta <= tolerance && dprMatch) {
+      if (sizeDelta < bestScore) {
+        best = preset;
+        bestScore = sizeDelta;
+      }
+    }
+  });
+
+  return best;
+}
+
 // Render the JS summary cards from collected client signals.
 function renderJsSummary(info, dictOverride) {
   const dict = dictOverride || i18n[detectLang()] || i18n.en;
@@ -343,6 +374,7 @@ function renderJsSummary(info, dictOverride) {
   const gpuMetaEl = document.getElementById('js-gpu-meta');
   const cpuEl = document.getElementById('js-cpu');
   const screenEl = document.getElementById('js-screen');
+  const deviceEl = document.getElementById('js-device');
   if (!langsEl || !matchEl || !gpuEl || !gpuMetaEl || !cpuEl || !screenEl) return;
 
   const jsLangs = info?.navigator?.languages || [];
@@ -413,6 +445,12 @@ function renderJsSummary(info, dictOverride) {
   addMetric(dict.js_screen_dpr_label, String(dprValue), dict.js_screen_dpr_help);
   if (colorDepth != null) addMetric(dict.js_screen_color_label, String(colorDepth));
   if (mtp != null) addMetric(dict.js_screen_touch_label, String(mtp));
+
+  if (deviceEl) {
+    const device = inferDeviceClass(size, dprValue);
+    const label = device ? `${device.group} · ${device.name}` : dict.js_device_unknown;
+    deviceEl.textContent = `${dict.js_device_hint}: ${label}`;
+  }
 }
 
 // Build an OpenStreetMap embed URL centered on the IP location.
