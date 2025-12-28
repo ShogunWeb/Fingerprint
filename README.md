@@ -26,4 +26,4 @@ It combines HTTP request details from PHP with client-side signals from JavaScri
 - JS: `src/app.js` (helpers in `src/app-utils.js`, i18n in `src/i18n.js`)
 
 ## License
-GNU Affero General Public License v3.0. See `LICENSE`.
+GNU Affero General Public License v3.0. See `LICENSE`. Copyright 2025 - Shogun Web
