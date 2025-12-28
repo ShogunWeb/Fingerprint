@@ -309,25 +309,6 @@ function updateDetectionLabels(dict) {
   }
 }
 
-// Parse Accept-Language and keep ordered language tags.
-function parseAcceptLanguageHeader(header) {
-  if (!header) return [];
-  return header
-    .split(',')
-    .map((part) => part.split(';')[0].trim())
-    .filter((token, idx, arr) => token && arr.indexOf(token) === idx);
-}
-
-// Compare JS vs HTTP language order for a simple match/mismatch signal.
-function compareLanguageLists(jsList, httpList) {
-  if (!jsList.length || !httpList.length) return 'unknown';
-  const len = Math.min(jsList.length, httpList.length);
-  for (let i = 0; i < len; i += 1) {
-    if (jsList[i].toLowerCase() !== httpList[i].toLowerCase()) return 'no';
-  }
-  return 'yes';
-}
-
 function updateLanguageMatchLabel(dict) {
   const el = document.getElementById('js-lang-match');
   if (!el) return;
@@ -378,7 +359,7 @@ function renderJsSummary(info, dictOverride) {
   if (!langsEl || !matchEl || !gpuEl || !gpuMetaEl || !cpuEl || !screenEl) return;
 
   const jsLangs = info?.navigator?.languages || [];
-  const httpLangs = parseAcceptLanguageHeader(document.body?.dataset?.httpAcceptLanguage);
+  const httpLangs = window.appUtils?.parseAcceptLanguageHeader(document.body?.dataset?.httpAcceptLanguage) || [];
 
   langsEl.textContent = '';
   jsLangs.forEach((lang) => {
@@ -388,7 +369,8 @@ function renderJsSummary(info, dictOverride) {
     langsEl.appendChild(pill);
   });
 
-  matchEl.dataset.status = compareLanguageLists(jsLangs, httpLangs);
+  const match = window.appUtils?.compareLanguageLists(jsLangs, httpLangs) || 'unknown';
+  matchEl.dataset.status = match;
   updateLanguageMatchLabel(dict);
 
   const gpu = info?.webgl;
@@ -447,21 +429,10 @@ function renderJsSummary(info, dictOverride) {
   if (mtp != null) addMetric(dict.js_screen_touch_label, String(mtp));
 
   if (deviceEl) {
-    const device = inferDeviceClass(size, dprValue);
+    const device = window.appUtils?.inferDeviceClass(size, dprValue);
     const label = device ? `${device.group} · ${device.name}` : dict.js_device_unknown;
     deviceEl.textContent = `${dict.js_device_hint}: ${label}`;
   }
-}
-
-// Build an OpenStreetMap embed URL centered on the IP location.
-function buildOsmUrl(lat, lon) {
-  const delta = 0.001;
-  const left = lon - delta;
-  const right = lon + delta;
-  const top = lat + delta;
-  const bottom = lat - delta;
-  const bbox = [left, bottom, right, top].join('%2C');
-  return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&marker=${lat}%2C${lon}&layer=mapnik`;
 }
 
 document.getElementById('geo-run')?.addEventListener('click', async () => {
@@ -478,7 +449,7 @@ document.getElementById('geo-run')?.addEventListener('click', async () => {
     setText('geo-net', data.network, dict.value_unavailable);
 
     if (data.latitude != null && data.longitude != null) {
-      const url = buildOsmUrl(Number(data.latitude), Number(data.longitude));
+      const url = window.appUtils?.buildOsmUrl(Number(data.latitude), Number(data.longitude));
       let map = document.getElementById('geo-map');
       if (!map) {
         const card = document.getElementById('geo-card');
@@ -489,14 +460,14 @@ document.getElementById('geo-run')?.addEventListener('click', async () => {
           card.appendChild(map);
         }
       }
-      if (map && !map.querySelector('iframe')) {
+      if (map && !map.querySelector('iframe') && url) {
         const frame = document.createElement('iframe');
         frame.id = 'geo-map-frame';
         frame.title = 'OpenStreetMap';
         frame.loading = 'lazy';
         frame.src = url;
         map.appendChild(frame);
-      } else if (map) {
+      } else if (map && url) {
         const frame = map.querySelector('iframe');
         if (frame) frame.src = url;
       }

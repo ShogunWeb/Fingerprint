@@ -1,0 +1,12 @@
+{
+  "name": "fingerprint/fingerprint",
+  "description": "Fingerprinting demo (PHP + JS)",
+  "require-dev": {
+    "phpunit/phpunit": "^10.5"
+  },
+  "autoload-dev": {
+    "files": [
+      "src/lib.php"
+    ]
+  }
+}
