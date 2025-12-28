@@ -1,0 +1,25 @@
+## Basic security + no-cache headers for Apache.
+## Assumes mod_headers is enabled.
+
+Options -Indexes
+ServerSignature Off
+
+<IfModule mod_headers.c>
+  # Prevent caching of responses.
+  Header set Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+  Header set Pragma "no-cache"
+  Header set Expires "0"
+
+  # Basic security headers.
+  Header set X-Content-Type-Options "nosniff"
+  Header set X-Frame-Options "SAMEORIGIN"
+  Header set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+
+  # Block access to hidden files (except .well-known).
+  RewriteCond %{REQUEST_URI} !^/\.well-known/ [NC]
+  RewriteRule "(^|/)\." - [F]
+</IfModule>
