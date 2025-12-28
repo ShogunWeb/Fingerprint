@@ -8,3 +8,4 @@
 .TemporaryItems
 .Trashes
 .VolumeIcon.icns
+!*.log
