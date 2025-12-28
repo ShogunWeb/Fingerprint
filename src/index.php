@@ -70,6 +70,9 @@ function parse_weighted_header(?string $header): array {
   return array_reverse($out);
 }
 
+/**
+ * Extract ordered language tags from Accept-Language.
+ */
 function parse_accept_language(?string $header): array {
   $items = parse_weighted_header($header);
   $seen = [];
@@ -83,6 +86,9 @@ function parse_accept_language(?string $header): array {
   return $out;
 }
 
+/**
+ * Extract ordered encoding tokens from Accept-Encoding.
+ */
 function parse_accept_encoding(?string $header): array {
   $items = parse_weighted_header($header);
   $seen = [];
@@ -144,7 +150,7 @@ function j($x): string {
   return json_encode($x, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 }
 
-// Extract key HTTP fingerprinting signals.
+// Extract key HTTP fingerprinting signals for the UI summary.
 $ip = $http['remote_addr'] ?? null;
 $accept_language = $headers_norm['accept-language'] ?? null;
 $accept_encoding = $headers_norm['accept-encoding'] ?? null;
@@ -152,6 +158,7 @@ $user_agent = $headers_norm['user-agent'] ?? null;
 $language_tags = parse_accept_language($accept_language);
 $encoding_tags = parse_accept_encoding($accept_encoding);
 $ua_info = parse_user_agent($user_agent);
+// Detect zstd support for a browser-corroboration hint.
 $has_zstd = false;
 foreach ($encoding_tags as $tag) {
   if (strtolower($tag) === 'zstd') {
@@ -224,6 +231,7 @@ header('Cache-Control: no-store');
         <?php endif; ?>
       </div>
       <div class="card-hint" data-i18n="http_ip_hint">Adresse IP vue par le serveur.</div>
+      <!-- Triggers a client-side GeoIP lookup (ipapi.co) on demand. -->
       <button id="geo-run" data-i18n="geo_button">Afficher la geolocalisation</button>
       <div id="geo-status" class="card-hint"></div>
     </div>
@@ -286,7 +294,8 @@ header('Cache-Control: no-store');
     </div>
   </div>
 
-  <div class="geo-card">
+  <!-- GeoIP result panel; hidden until the user clicks the button. -->
+  <div class="geo-card hidden" id="geo-card">
     <div id="geo-details" class="geo-details hidden">
       <div class="kv">
         <span class="kv-label" data-i18n="geo_country_label">Pays</span>
@@ -300,9 +309,6 @@ header('Cache-Control: no-store');
         <span class="kv-label" data-i18n="geo_net_label">Reseau</span>
         <span id="geo-net" class="kv-value"></span>
       </div>
-    </div>
-    <div id="geo-map" class="geo-map hidden">
-      <iframe id="geo-map-frame" title="OpenStreetMap" loading="lazy"></iframe>
     </div>
   </div>
 

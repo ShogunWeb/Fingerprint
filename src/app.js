@@ -1,3 +1,4 @@
+// UI copy for FR/EN and status messages.
 const i18n = {
   fr: {
     title: 'Informations visibles sur vous',
@@ -57,6 +58,7 @@ const i18n = {
   }
 };
 
+// Detect preferred UI language (stored choice wins, else browser locale).
 function detectLang() {
   const stored = localStorage.getItem('ui_lang');
   if (stored && i18n[stored]) return stored;
@@ -64,6 +66,7 @@ function detectLang() {
   return nav.startsWith('fr') ? 'fr' : 'en';
 }
 
+// Apply translations to elements marked with data-i18n.
 function applyTranslations(lang) {
   const dict = i18n[lang] || i18n.en;
   document.querySelectorAll('[data-i18n]').forEach((el) => {
@@ -189,14 +192,17 @@ document.getElementById('lang').addEventListener('change', (e) => {
 applyTranslations(detectLang());
 runCollection();
 
+// GeoIP helpers (triggered by button click).
 function setGeoStatus(message) {
   const status = document.getElementById('geo-status');
   if (status) status.textContent = message || '';
 }
 
 function showGeoDetails() {
+  document.getElementById('geo-card')?.classList.remove('hidden');
   document.getElementById('geo-details')?.classList.remove('hidden');
-  document.getElementById('geo-map')?.classList.remove('hidden');
+  const map = document.getElementById('geo-map');
+  if (map) map.classList.remove('hidden');
 }
 
 function setText(id, value, fallback) {
@@ -205,8 +211,9 @@ function setText(id, value, fallback) {
   el.textContent = value || fallback || '';
 }
 
+// Build an OpenStreetMap embed URL centered on the IP location.
 function buildOsmUrl(lat, lon) {
-  const delta = 0.15;
+  const delta = 0.001;
   const left = lon - delta;
   const right = lon + delta;
   const top = lat + delta;
@@ -230,8 +237,27 @@ document.getElementById('geo-run')?.addEventListener('click', async () => {
 
     if (data.latitude != null && data.longitude != null) {
       const url = buildOsmUrl(Number(data.latitude), Number(data.longitude));
-      const frame = document.getElementById('geo-map-frame');
-      if (frame) frame.src = url;
+      let map = document.getElementById('geo-map');
+      if (!map) {
+        const card = document.getElementById('geo-card');
+        if (card) {
+          map = document.createElement('div');
+          map.id = 'geo-map';
+          map.className = 'geo-map hidden';
+          card.appendChild(map);
+        }
+      }
+      if (map && !map.querySelector('iframe')) {
+        const frame = document.createElement('iframe');
+        frame.id = 'geo-map-frame';
+        frame.title = 'OpenStreetMap';
+        frame.loading = 'lazy';
+        frame.src = url;
+        map.appendChild(frame);
+      } else if (map) {
+        const frame = map.querySelector('iframe');
+        if (frame) frame.src = url;
+      }
     }
 
     showGeoDetails();
