@@ -220,6 +220,20 @@ $tor_ua = is_tor_browser_ua($user_agent);
 $tor_status = ($tor_exit === true) ? 'yes' : ($tor_ua ? 'maybe' : 'unknown');
 $tor_dns_status = ($tor_exit === null) ? 'failed' : 'success';
 
+// Log each access to a daily file in /logs (timestamp, IP, user-agent).
+$log_dir = __DIR__ . '/logs';
+if (!is_dir($log_dir)) {
+  @mkdir($log_dir, 0775, true);
+}
+$log_date = gmdate('ymd');
+$log_file = $log_dir . '/' . $log_date . '.log';
+$log_ts = $http['timestamp_server_utc'] ?? gmdate('c');
+$log_ip = $ip ?? '-';
+$log_ua = $user_agent ?? '-';
+$log_ua = str_replace(["\t", "\r", "\n"], ' ', $log_ua);
+$log_line = $log_ts . "\t" . $log_ip . "\t" . $log_ua . "\n";
+@file_put_contents($log_file, $log_line, FILE_APPEND | LOCK_EX);
+
 // Prevent caching so every reload reflects current request/client state.
 header('Cache-Control: no-store');
 ?><!doctype html>
