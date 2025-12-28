@@ -5,9 +5,7 @@ const i18n = {
     note: 'Cette page affiche ce que le serveur reçoit via HTTP + ce que le navigateur expose via JavaScript. Rien n\u2019est \u201cpirate\u201d : ce sont des signaux standards. Certains champs peuvent etre masques par des protections (VPN, anti-fingerprint, etc.).',
     server_section: 'Depuis la connexion HTTP (cote serveur)',
     js_section: 'Depuis JavaScript (cote navigateur)',
-    collect_button: 'Collecter les details navigateur',
-    collect_placeholder: '(clique sur "Collecter les details navigateur")',
-    other_section: 'Autres / derive'
+    collecting_placeholder: '(collecte en cours...)'
   },
   en: {
     title: 'Information visible about you',
@@ -15,9 +13,7 @@ const i18n = {
     note: 'This page shows what the server receives via HTTP and what the browser exposes via JavaScript. Nothing is "hacked": these are standard signals. Some fields may be masked by protections (VPN, anti-fingerprint, etc.).',
     server_section: 'From the HTTP connection (server side)',
     js_section: 'From JavaScript (browser side)',
-    collect_button: 'Collect browser details',
-    collect_placeholder: '(click "Collect browser details")',
-    other_section: 'Other / derived'
+    collecting_placeholder: '(collecting...)'
   }
 };
 
@@ -132,14 +128,15 @@ async function collectAll() {
   return info;
 }
 
-// Run collection on demand to make behavior explicit.
-document.getElementById('run').addEventListener('click', async () => {
+// Collect immediately on page load.
+async function runCollection() {
   const data = await collectAll();
   document.getElementById('js').textContent = JSON.stringify(data, null, 2);
-});
+}
 
 // Initialize UI language from browser or stored choice.
 document.getElementById('lang').addEventListener('change', (e) => {
   applyTranslations(e.target.value);
 });
 applyTranslations(detectLang());
+runCollection();

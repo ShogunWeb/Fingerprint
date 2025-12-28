@@ -51,14 +51,6 @@ foreach ($forward_headers as $h) {
   if (isset($headers_norm[$h]) && $headers_norm[$h] !== '') $present[$h] = $headers_norm[$h];
 }
 
-// Derived fields not directly from server vars.
-$other = [
-  'proxy_or_cdn_hint' => count($present) > 0,
-  'forwarding_headers_present' => $present,
-  'user_agent_server_seen' => $headers_norm['user-agent'] ?? null,
-  'accept_language' => $headers_norm['accept-language'] ?? null,
-];
-
 // JSON helper to keep output readable and Unicode-friendly.
 function j($x): string {
   return json_encode($x, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
@@ -101,11 +93,7 @@ header('Cache-Control: no-store');
   <pre id="http"><?= htmlspecialchars(j($http), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></pre>
 
   <h2 data-i18n="js_section">Depuis JavaScript (côté navigateur)</h2>
-  <button id="run" data-i18n="collect_button">Collecter les détails navigateur</button>
-  <pre id="js" data-i18n="collect_placeholder">(clique sur “Collecter les détails navigateur”)</pre>
-
-  <h2 data-i18n="other_section">Autres / dérivé</h2>
-  <pre id="other"><?= htmlspecialchars(j($other), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></pre>
+  <pre id="js" data-i18n="collecting_placeholder">(collecte en cours…)</pre>
 
 <script src="app.js"></script>
 </body>
