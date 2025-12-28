@@ -90,8 +90,9 @@ header('Cache-Control: no-store');
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body data-http-accept-language="<?= htmlspecialchars($accept_language ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
-  <div style="display:flex; gap:12px; align-items:center; margin-bottom:12px;">
-    <h1 style="margin:0;" data-i18n="title">Informations visibles sur vous</h1>
+  <!-- Page header: title on the left, language selector on the right. -->
+  <header class="page-header">
+    <h1 data-i18n="title">Basic fingerprinting</h1>
     <label style="font-size:12px;">
       <span data-i18n="lang_label">Langue</span>:
       <select id="lang">
@@ -99,7 +100,7 @@ header('Cache-Control: no-store');
         <option value="en">EN</option>
       </select>
     </label>
-  </div>
+  </header>
   <div class="note" data-i18n="note">
     Cette page affiche ce que le serveur reçoit via HTTP + ce que le navigateur expose via JavaScript.
     Rien n’est “piraté” : ce sont des signaux standards. Certains champs peuvent être masqués par des protections (VPN, anti-fingerprint, etc.).

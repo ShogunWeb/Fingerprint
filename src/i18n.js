@@ -1,7 +1,7 @@
 // UI copy for FR/EN and status messages.
 window.I18N = {
   fr: {
-    title: 'Informations visibles sur vous',
+    title: 'Empreinte basique',
     lang_label: 'Langue',
     note: 'Cette page affiche ce que le serveur reçoit via HTTP + ce que le navigateur expose via JavaScript. Rien n\u2019est \u201cpiraté\u201d : ce sont des signaux standards. Certains champs peuvent être masqués par des protections (VPN, anti-fingerprint, etc.).',
     privacy_note: 'Cette page enregistre l\u2019IP et le User-Agent (logs locaux). La géolocalisation IP est effectuée via ipapi.co uniquement si vous cliquez sur le bouton.',
@@ -64,7 +64,7 @@ window.I18N = {
     js_device_unknown: 'Inconnu'
   },
   en: {
-    title: 'Information visible about you',
+    title: 'Basic fingerprinting',
     lang_label: 'Language',
     note: 'This page shows what the server receives via HTTP and what the browser exposes via JavaScript. Nothing is "hacked": these are standard signals. Some fields may be masked by protections (VPN, anti-fingerprint, etc.).',
     privacy_note: 'This page logs IP and User-Agent locally. IP geolocation uses ipapi.co only when you click the button.',
