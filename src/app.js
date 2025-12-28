@@ -44,7 +44,21 @@ const i18n = {
     geo_error: 'Impossible de récupérer les données de géolocalisation.',
     js_section: 'Depuis JavaScript (côté navigateur)',
     js_section_summary: 'Afficher les détails navigateur (JSON)',
-    collecting_placeholder: '(collecte en cours...)'
+    collecting_placeholder: '(collecte en cours...)',
+    js_languages: 'Langues (JS)',
+    js_language_match_label: 'Cohérence HTTP',
+    js_language_match_yes: 'Concorde',
+    js_language_match_no: 'Différent',
+    js_language_match_unknown: 'Inconnu',
+    js_gpu: 'GPU (WebGL)',
+    js_cpu: 'CPU logiques',
+    js_cpu_hint: 'navigator.hardwareConcurrency',
+    js_screen: 'Écran',
+    js_screen_size_label: 'Taille',
+    js_screen_dpr_label: 'DPR',
+    js_screen_color_label: 'Profondeur couleur',
+    js_screen_touch_label: 'Points tactiles',
+    js_screen_dpr_help: 'DPR = ratio entre pixels physiques et CSS.'
   },
   en: {
     title: 'Information visible about you',
@@ -90,9 +104,26 @@ const i18n = {
     geo_error: 'Unable to fetch geolocation data.',
     js_section: 'From JavaScript (browser side)',
     js_section_summary: 'Show browser details (JSON)',
-    collecting_placeholder: '(collecting...)'
+    collecting_placeholder: '(collecting...)',
+    js_languages: 'Languages (JS)',
+    js_language_match_label: 'HTTP match',
+    js_language_match_yes: 'Matches',
+    js_language_match_no: 'Different',
+    js_language_match_unknown: 'Unknown',
+    js_gpu: 'GPU (WebGL)',
+    js_cpu: 'Logical CPU',
+    js_cpu_hint: 'navigator.hardwareConcurrency',
+    js_screen: 'Screen',
+    js_screen_size_label: 'Size',
+    js_screen_dpr_label: 'DPR',
+    js_screen_color_label: 'Color depth',
+    js_screen_touch_label: 'Touch points',
+    js_screen_dpr_help: 'DPR = ratio of physical to CSS pixels.'
   }
 };
+
+// Cache latest JS signals so labels can re-render on language switch.
+let lastJsInfo = null;
 
 // Detect preferred UI language (stored choice wins, else browser locale).
 function detectLang() {
@@ -122,6 +153,8 @@ function applyTranslations(lang) {
   }
 
   updateDetectionLabels(dict);
+  updateLanguageMatchLabel(dict);
+  if (lastJsInfo) renderJsSummary(lastJsInfo, dict);
 }
 
 // WebGL renderer info can reveal GPU model and driver details.
@@ -223,6 +256,8 @@ async function runCollection() {
   if (!jsPre) return;
   jsPre.dataset.collected = 'true';
   jsPre.textContent = JSON.stringify(data, null, 2);
+  lastJsInfo = data;
+  renderJsSummary(data);
 }
 
 // Initialize UI language from browser or stored choice.
@@ -268,6 +303,116 @@ function updateDetectionLabels(dict) {
     tor.classList.remove('status-yes', 'status-no', 'status-unknown', 'status-maybe');
     tor.classList.add(`status-${state}`);
   }
+}
+
+// Parse Accept-Language and keep ordered language tags.
+function parseAcceptLanguageHeader(header) {
+  if (!header) return [];
+  return header
+    .split(',')
+    .map((part) => part.split(';')[0].trim())
+    .filter((token, idx, arr) => token && arr.indexOf(token) === idx);
+}
+
+// Compare JS vs HTTP language order for a simple match/mismatch signal.
+function compareLanguageLists(jsList, httpList) {
+  if (!jsList.length || !httpList.length) return 'unknown';
+  const len = Math.min(jsList.length, httpList.length);
+  for (let i = 0; i < len; i += 1) {
+    if (jsList[i].toLowerCase() !== httpList[i].toLowerCase()) return 'no';
+  }
+  return 'yes';
+}
+
+function updateLanguageMatchLabel(dict) {
+  const el = document.getElementById('js-lang-match');
+  if (!el) return;
+  const state = el.dataset.status || 'unknown';
+  const key = state === 'yes' ? 'js_language_match_yes' : state === 'no' ? 'js_language_match_no' : 'js_language_match_unknown';
+  el.textContent = dict[key];
+  el.classList.remove('status-yes', 'status-no', 'status-unknown');
+  el.classList.add(`status-${state}`);
+}
+
+// Render the JS summary cards from collected client signals.
+function renderJsSummary(info, dictOverride) {
+  const dict = dictOverride || i18n[detectLang()] || i18n.en;
+  const langsEl = document.getElementById('js-lang-list');
+  const matchEl = document.getElementById('js-lang-match');
+  const gpuEl = document.getElementById('js-gpu');
+  const gpuMetaEl = document.getElementById('js-gpu-meta');
+  const cpuEl = document.getElementById('js-cpu');
+  const screenEl = document.getElementById('js-screen');
+  if (!langsEl || !matchEl || !gpuEl || !gpuMetaEl || !cpuEl || !screenEl) return;
+
+  const jsLangs = info?.navigator?.languages || [];
+  const httpLangs = parseAcceptLanguageHeader(document.body?.dataset?.httpAcceptLanguage);
+
+  langsEl.textContent = '';
+  jsLangs.forEach((lang) => {
+    const pill = document.createElement('span');
+    pill.className = 'pill';
+    pill.textContent = lang;
+    langsEl.appendChild(pill);
+  });
+
+  matchEl.dataset.status = compareLanguageLists(jsLangs, httpLangs);
+  updateLanguageMatchLabel(dict);
+
+  const gpu = info?.webgl;
+  if (gpu?.available) {
+    gpuEl.textContent = gpu.unmaskedRenderer || gpu.renderer || 'WebGL';
+    const vendor = gpu.unmaskedVendor || '';
+    gpuMetaEl.textContent = vendor ? vendor : '';
+  } else {
+    gpuEl.textContent = dict.value_unavailable || 'Unavailable';
+    gpuMetaEl.textContent = '';
+  }
+
+  cpuEl.textContent = info?.navigator?.hardwareConcurrency ?? (dict.value_unavailable || 'Unavailable');
+
+  const s = info?.screen || {};
+  const dpr = s.devicePixelRatio ?? window.devicePixelRatio ?? 1;
+  const mtp = info?.navigator?.maxTouchPoints ?? null;
+  const colorDepth = s.colorDepth ?? null;
+  const size = (s.width && s.height) ? `${s.width}×${s.height}` : null;
+  const dprValue = Math.round(dpr * 100) / 100;
+
+  screenEl.textContent = '';
+  const addMetric = (label, value, hint) => {
+    const line = document.createElement('div');
+    line.className = 'metric-line';
+
+    const labelEl = document.createElement('span');
+    labelEl.className = 'metric-label';
+    labelEl.textContent = label;
+    line.appendChild(labelEl);
+
+    if (hint) {
+      const hintEl = document.createElement('span');
+      hintEl.className = 'hint-icon';
+      hintEl.textContent = '?';
+      hintEl.title = hint;
+      hintEl.setAttribute('aria-label', hint);
+      line.appendChild(hintEl);
+    }
+
+    const sep = document.createElement('span');
+    sep.textContent = ':';
+    line.appendChild(sep);
+
+    const valueEl = document.createElement('span');
+    valueEl.className = 'metric-value';
+    valueEl.textContent = value;
+    line.appendChild(valueEl);
+
+    screenEl.appendChild(line);
+  };
+
+  if (size) addMetric(dict.js_screen_size_label, `${size}px`);
+  addMetric(dict.js_screen_dpr_label, String(dprValue), dict.js_screen_dpr_help);
+  if (colorDepth != null) addMetric(dict.js_screen_color_label, String(colorDepth));
+  if (mtp != null) addMetric(dict.js_screen_touch_label, String(mtp));
 }
 
 // Build an OpenStreetMap embed URL centered on the IP location.

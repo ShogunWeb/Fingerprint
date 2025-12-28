@@ -254,6 +254,10 @@ header('Cache-Control: no-store');
     .status-no { background: #dcfce7; color: #14532d; border-color: #bbf7d0; }
     .status-unknown { background: #f3f4f6; color: #374151; border-color: #e5e7eb; }
     .status-maybe { background: #fef3c7; color: #78350f; border-color: #fde68a; }
+    .metric-line { display: flex; gap: 6px; align-items: baseline; font-weight: 400; }
+    .metric-label { color: #555; }
+    .metric-value { font-weight: 600; color: #111; }
+    .hint-icon { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border-radius: 999px; border: 1px solid #bbb; font-size: 11px; color: #555; margin-left: 4px; }
     .geo-card { background: #fff; border: 1px solid #e6e6e6; border-radius: 12px; padding: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); margin-bottom: 12px; }
     .geo-details { margin-top: 8px; }
     .geo-map { margin-top: 10px; border-radius: 12px; overflow: hidden; border: 1px solid #eee; }
@@ -261,7 +265,7 @@ header('Cache-Control: no-store');
     .hidden { display: none; }
   </style>
 </head>
-<body>
+<body data-http-accept-language="<?= htmlspecialchars($accept_language ?? '', ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
   <div style="display:flex; gap:12px; align-items:center; margin-bottom:12px;">
     <h1 style="margin:0;" data-i18n="title">Informations visibles sur vous</h1>
     <label style="font-size:12px;">
@@ -415,6 +419,34 @@ header('Cache-Control: no-store');
   </details>
 
   <h2 data-i18n="js_section">Depuis JavaScript (côté navigateur)</h2>
+  <!-- Client-side summary cards for key JS fingerprinting signals. -->
+  <div class="http-cards" id="js-summary">
+    <div class="card">
+      <div class="card-title" data-i18n="js_languages">Langues (JS)</div>
+      <div id="js-lang-list" class="pills"></div>
+      <div class="card-hint">
+        <span data-i18n="js_language_match_label">Cohérence HTTP</span>:
+        <span id="js-lang-match" class="status-pill status-unknown">-</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" data-i18n="js_gpu">GPU (WebGL)</div>
+      <div id="js-gpu" class="card-value"><span class="muted" data-i18n="collecting_placeholder">(collecte en cours...)</span></div>
+      <div id="js-gpu-meta" class="card-hint"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" data-i18n="js_cpu">CPU logiques</div>
+      <div id="js-cpu" class="card-value"><span class="muted" data-i18n="collecting_placeholder">(collecte en cours...)</span></div>
+      <div class="card-hint" data-i18n="js_cpu_hint">navigator.hardwareConcurrency</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" data-i18n="js_screen">Écran</div>
+      <div id="js-screen" class="card-value"><span class="muted" data-i18n="collecting_placeholder">(collecte en cours...)</span></div>
+    </div>
+  </div>
   <details class="accordion">
     <summary data-i18n="js_section_summary">Afficher les détails navigateur (JSON)</summary>
     <pre id="js">(collecte en cours…)</pre>
