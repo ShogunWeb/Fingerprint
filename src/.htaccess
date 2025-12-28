@@ -14,6 +14,7 @@ ServerSignature Off
   Header set X-Content-Type-Options "nosniff"
   Header set X-Frame-Options "SAMEORIGIN"
   Header set Referrer-Policy "strict-origin-when-cross-origin"
+  Header set Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://www.openstreetmap.org; connect-src 'self' https://ipapi.co; frame-src https://www.openstreetmap.org; object-src 'none'; base-uri 'none'; frame-ancestors 'self'"
 </IfModule>
 
 <IfModule mod_rewrite.c>
@@ -22,4 +23,9 @@ ServerSignature Off
   # Block access to hidden files (except .well-known).
   RewriteCond %{REQUEST_URI} !^/\.well-known/ [NC]
   RewriteRule "(^|/)\." - [F]
+</IfModule>
+
+# Block direct access to logs if they are under the web root.
+<IfModule mod_rewrite.c>
+  RewriteRule ^logs/ - [F]
 </IfModule>

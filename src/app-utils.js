@@ -27,6 +27,8 @@
 
   // Build an OpenStreetMap embed URL centered on the IP location.
   function buildOsmUrl(lat, lon) {
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
     const delta = 0.001;
     const left = lon - delta;
     const right = lon + delta;
