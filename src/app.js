@@ -4,7 +4,27 @@ const i18n = {
     lang_label: 'Langue',
     note: 'Cette page affiche ce que le serveur reçoit via HTTP + ce que le navigateur expose via JavaScript. Rien n\u2019est \u201cpirate\u201d : ce sont des signaux standards. Certains champs peuvent etre masques par des protections (VPN, anti-fingerprint, etc.).',
     server_section: 'Depuis la connexion HTTP (cote serveur)',
+    server_section_summary: 'Afficher les details HTTP (JSON)',
+    http_ip: 'IP',
+    http_ip_hint: 'Adresse IP vue par le serveur.',
+    http_accept_language: 'Accept-Language',
+    http_accept_language_hint: 'Codes de langue preferes declares par le navigateur.',
+    http_user_agent: 'User-Agent',
+    http_user_agent_hint: 'Extrait du User-Agent HTTP.',
+    http_accept_encoding: 'Accept-Encoding',
+    http_accept_encoding_hint: 'Methodes de compression supportees par le navigateur.',
+    encoding_zstd_hint: 'Le support de zstd est souvent actif sur Firefox, utile pour corroborer le navigateur.',
+    ua_browser_label: 'Navigateur',
+    ua_os_label: 'OS',
+    value_unavailable: 'Indisponible',
+    geo_button: 'Afficher la geolocalisation',
+    geo_country_label: 'Pays',
+    geo_org_label: 'Organisation',
+    geo_net_label: 'Reseau',
+    geo_loading: 'Requete en cours...',
+    geo_error: 'Impossible de recuperer les donnees de geolocalisation.',
     js_section: 'Depuis JavaScript (cote navigateur)',
+    js_section_summary: 'Afficher les details navigateur (JSON)',
     collecting_placeholder: '(collecte en cours...)'
   },
   en: {
@@ -12,7 +32,27 @@ const i18n = {
     lang_label: 'Language',
     note: 'This page shows what the server receives via HTTP and what the browser exposes via JavaScript. Nothing is "hacked": these are standard signals. Some fields may be masked by protections (VPN, anti-fingerprint, etc.).',
     server_section: 'From the HTTP connection (server side)',
+    server_section_summary: 'Show HTTP details (JSON)',
+    http_ip: 'IP',
+    http_ip_hint: 'IP address as seen by the server.',
+    http_accept_language: 'Accept-Language',
+    http_accept_language_hint: 'Preferred language codes declared by the browser.',
+    http_user_agent: 'User-Agent',
+    http_user_agent_hint: 'Extracted from the HTTP User-Agent.',
+    http_accept_encoding: 'Accept-Encoding',
+    http_accept_encoding_hint: 'Compression methods supported by the browser.',
+    encoding_zstd_hint: 'zstd support is often enabled in Firefox and can help corroborate the browser.',
+    ua_browser_label: 'Browser',
+    ua_os_label: 'OS',
+    value_unavailable: 'Unavailable',
+    geo_button: 'Show geolocation',
+    geo_country_label: 'Country',
+    geo_org_label: 'Organization',
+    geo_net_label: 'Network',
+    geo_loading: 'Request in progress...',
+    geo_error: 'Unable to fetch geolocation data.',
     js_section: 'From JavaScript (browser side)',
+    js_section_summary: 'Show browser details (JSON)',
     collecting_placeholder: '(collecting...)'
   }
 };
@@ -148,3 +188,55 @@ document.getElementById('lang').addEventListener('change', (e) => {
 });
 applyTranslations(detectLang());
 runCollection();
+
+function setGeoStatus(message) {
+  const status = document.getElementById('geo-status');
+  if (status) status.textContent = message || '';
+}
+
+function showGeoDetails() {
+  document.getElementById('geo-details')?.classList.remove('hidden');
+  document.getElementById('geo-map')?.classList.remove('hidden');
+}
+
+function setText(id, value, fallback) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = value || fallback || '';
+}
+
+function buildOsmUrl(lat, lon) {
+  const delta = 0.15;
+  const left = lon - delta;
+  const right = lon + delta;
+  const top = lat + delta;
+  const bottom = lat - delta;
+  const bbox = [left, bottom, right, top].join('%2C');
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&marker=${lat}%2C${lon}&layer=mapnik`;
+}
+
+document.getElementById('geo-run')?.addEventListener('click', async () => {
+  const dict = i18n[detectLang()] || i18n.en;
+  setGeoStatus(dict.geo_loading);
+
+  try {
+    const res = await fetch('https://ipapi.co/json/');
+    if (!res.ok) throw new Error('geo request failed');
+    const data = await res.json();
+
+    setText('geo-country', data.country_name, dict.value_unavailable);
+    setText('geo-org', data.org, dict.value_unavailable);
+    setText('geo-net', data.network, dict.value_unavailable);
+
+    if (data.latitude != null && data.longitude != null) {
+      const url = buildOsmUrl(Number(data.latitude), Number(data.longitude));
+      const frame = document.getElementById('geo-map-frame');
+      if (frame) frame.src = url;
+    }
+
+    showGeoDetails();
+    setGeoStatus('');
+  } catch (err) {
+    setGeoStatus(dict.geo_error);
+  }
+});

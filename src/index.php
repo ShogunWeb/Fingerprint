@@ -44,16 +44,120 @@ $http = [
   'headers' => $headers_norm,
 ];
 
-// Heuristics for a "proxy/CDN likely in path" hint.
-$forward_headers = ['x-forwarded-for','x-real-ip','forwarded','cf-connecting-ip','true-client-ip','x-forwarded-proto','x-forwarded-port','x-remote-ip'];
-$present = [];
-foreach ($forward_headers as $h) {
-  if (isset($headers_norm[$h]) && $headers_norm[$h] !== '') $present[$h] = $headers_norm[$h];
+/**
+ * Parse a weighted header list like "en-US,en;q=0.9".
+ * Returns tokens sorted by descending weight.
+ */
+function parse_weighted_header(?string $header): array {
+  if (!$header) return [];
+  $parts = array_map('trim', explode(',', $header));
+  $out = [];
+  foreach ($parts as $part) {
+    if ($part === '') continue;
+    $q = 1.0;
+    $token = $part;
+    if (strpos($part, ';') !== false) {
+      [$token, $params] = array_map('trim', explode(';', $part, 2));
+      if (preg_match('/q=([0-9.]+)/i', $params, $m)) {
+        $q = (float) $m[1];
+      }
+    }
+    $out[] = ['token' => $token, 'q' => $q];
+  }
+  usort($out, function ($a, $b) {
+    return $a['q'] <=> $b['q'];
+  });
+  return array_reverse($out);
+}
+
+function parse_accept_language(?string $header): array {
+  $items = parse_weighted_header($header);
+  $seen = [];
+  $out = [];
+  foreach ($items as $item) {
+    $key = strtolower($item['token']);
+    if ($key === '' || isset($seen[$key])) continue;
+    $seen[$key] = true;
+    $out[] = $item['token'];
+  }
+  return $out;
+}
+
+function parse_accept_encoding(?string $header): array {
+  $items = parse_weighted_header($header);
+  $seen = [];
+  $out = [];
+  foreach ($items as $item) {
+    $key = strtolower($item['token']);
+    if ($key === '' || isset($seen[$key])) continue;
+    $seen[$key] = true;
+    $out[] = $item['token'];
+  }
+  return $out;
+}
+
+/**
+ * Lightweight user-agent parsing to extract browser and OS labels.
+ */
+function parse_user_agent(?string $ua): array {
+  if (!$ua) return ['browser' => null, 'os' => null];
+  $browser = null;
+  $os = null;
+
+  if (preg_match('/Edg\/([\d\.]+)/', $ua, $m)) {
+    $browser = 'Edge ' . $m[1];
+  } elseif (preg_match('/OPR\/([\d\.]+)/', $ua, $m)) {
+    $browser = 'Opera ' . $m[1];
+  } elseif (preg_match('/Chrome\/([\d\.]+)/', $ua, $m)) {
+    $browser = 'Chrome ' . $m[1];
+  } elseif (preg_match('/Firefox\/([\d\.]+)/', $ua, $m)) {
+    $browser = 'Firefox ' . $m[1];
+  } elseif (preg_match('/Version\/([\d\.]+).*Safari/', $ua, $m)) {
+    $browser = 'Safari ' . $m[1];
+  }
+
+  if (preg_match('/Windows NT 10\.0/', $ua)) {
+    $os = 'Windows 10/11';
+  } elseif (preg_match('/Windows NT 6\.3/', $ua)) {
+    $os = 'Windows 8.1';
+  } elseif (preg_match('/Windows NT 6\.2/', $ua)) {
+    $os = 'Windows 8';
+  } elseif (preg_match('/Windows NT 6\.1/', $ua)) {
+    $os = 'Windows 7';
+  } elseif (preg_match('/Android ([\d\.]+)/', $ua, $m)) {
+    $os = 'Android ' . $m[1];
+  } elseif (preg_match('/iPhone OS ([\d_]+)/', $ua, $m)) {
+    $os = 'iOS ' . str_replace('_', '.', $m[1]);
+  } elseif (preg_match('/iPad.*OS ([\d_]+)/', $ua, $m)) {
+    $os = 'iPadOS ' . str_replace('_', '.', $m[1]);
+  } elseif (preg_match('/Mac OS X ([\d_]+)/', $ua, $m)) {
+    $os = 'macOS ' . str_replace('_', '.', $m[1]);
+  } elseif (preg_match('/Linux/', $ua)) {
+    $os = 'Linux';
+  }
+
+  return ['browser' => $browser, 'os' => $os];
 }
 
 // JSON helper to keep output readable and Unicode-friendly.
 function j($x): string {
   return json_encode($x, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+}
+
+// Extract key HTTP fingerprinting signals.
+$ip = $http['remote_addr'] ?? null;
+$accept_language = $headers_norm['accept-language'] ?? null;
+$accept_encoding = $headers_norm['accept-encoding'] ?? null;
+$user_agent = $headers_norm['user-agent'] ?? null;
+$language_tags = parse_accept_language($accept_language);
+$encoding_tags = parse_accept_encoding($accept_encoding);
+$ua_info = parse_user_agent($user_agent);
+$has_zstd = false;
+foreach ($encoding_tags as $tag) {
+  if (strtolower($tag) === 'zstd') {
+    $has_zstd = true;
+    break;
+  }
 }
 
 // Prevent caching so every reload reflects current request/client state.
@@ -71,6 +175,25 @@ header('Cache-Control: no-store');
     pre { background: #f6f6f6; padding: 12px; border-radius: 10px; overflow: auto; }
     .note { font-size: 12px; color: #444; margin-bottom: 12px; }
     button { padding: 10px 12px; border-radius: 10px; border: 1px solid #ccc; background: #fff; cursor: pointer; }
+    details.accordion { margin-bottom: 12px; }
+    details.accordion > summary { cursor: pointer; font-weight: 600; margin-bottom: 8px; }
+    details.accordion > summary::marker { color: #666; }
+    .http-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 12px; }
+    .card { background: #fff; border: 1px solid #e6e6e6; border-radius: 12px; padding: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
+    .card-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: #666; margin-bottom: 6px; }
+    .card-value { font-size: 14px; font-weight: 600; margin-bottom: 6px; word-break: break-word; }
+    .card-hint { font-size: 12px; color: #666; }
+    .pills { display: flex; flex-wrap: wrap; gap: 6px; }
+    .pill { background: #f0f2f5; border-radius: 999px; padding: 2px 8px; font-size: 12px; }
+    .pill.highlight { background: #ffedd5; color: #7c2d12; border: 1px solid #fed7aa; }
+    .kv { display: flex; gap: 8px; font-size: 13px; margin: 4px 0; }
+    .kv-label { color: #666; min-width: 70px; }
+    .muted { color: #888; font-weight: 400; }
+    .geo-card { background: #fff; border: 1px solid #e6e6e6; border-radius: 12px; padding: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); margin-bottom: 12px; }
+    .geo-details { margin-top: 8px; }
+    .geo-map { margin-top: 10px; border-radius: 12px; overflow: hidden; border: 1px solid #eee; }
+    .geo-map iframe { width: 100%; height: 260px; border: 0; display: block; }
+    .hidden { display: none; }
   </style>
 </head>
 <body>
@@ -90,10 +213,109 @@ header('Cache-Control: no-store');
   </div>
 
   <h2 data-i18n="server_section">Depuis la connexion HTTP (côté serveur)</h2>
-  <pre id="http"><?= htmlspecialchars(j($http), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></pre>
+  <div class="http-cards">
+    <div class="card">
+      <div class="card-title" data-i18n="http_ip">IP</div>
+      <div class="card-value">
+        <?php if ($ip): ?>
+          <?= htmlspecialchars($ip, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>
+        <?php else: ?>
+          <span class="muted" data-i18n="value_unavailable">Indisponible</span>
+        <?php endif; ?>
+      </div>
+      <div class="card-hint" data-i18n="http_ip_hint">Adresse IP vue par le serveur.</div>
+      <button id="geo-run" data-i18n="geo_button">Afficher la geolocalisation</button>
+      <div id="geo-status" class="card-hint"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" data-i18n="http_accept_language">Accept-Language</div>
+      <?php if ($language_tags): ?>
+        <div class="pills">
+          <?php foreach ($language_tags as $tag): ?>
+            <span class="pill"><?= htmlspecialchars($tag, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></span>
+          <?php endforeach; ?>
+        </div>
+      <?php else: ?>
+        <div class="card-value"><span class="muted" data-i18n="value_unavailable">Indisponible</span></div>
+      <?php endif; ?>
+      <div class="card-hint" data-i18n="http_accept_language_hint">Codes de langue preferes declares par le navigateur.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" data-i18n="http_user_agent">User-Agent</div>
+      <div class="kv">
+        <span class="kv-label" data-i18n="ua_browser_label">Navigateur</span>
+        <span class="kv-value">
+          <?php if (!empty($ua_info['browser'])): ?>
+            <?= htmlspecialchars($ua_info['browser'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>
+          <?php else: ?>
+            <span class="muted" data-i18n="value_unavailable">Indisponible</span>
+          <?php endif; ?>
+        </span>
+      </div>
+      <div class="kv">
+        <span class="kv-label" data-i18n="ua_os_label">OS</span>
+        <span class="kv-value">
+          <?php if (!empty($ua_info['os'])): ?>
+            <?= htmlspecialchars($ua_info['os'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>
+          <?php else: ?>
+            <span class="muted" data-i18n="value_unavailable">Indisponible</span>
+          <?php endif; ?>
+        </span>
+      </div>
+      <div class="card-hint" data-i18n="http_user_agent_hint">Extrait du User-Agent HTTP.</div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" data-i18n="http_accept_encoding">Accept-Encoding</div>
+      <?php if ($encoding_tags): ?>
+        <div class="pills">
+          <?php foreach ($encoding_tags as $tag): ?>
+            <?php $is_zstd = strtolower($tag) === 'zstd'; ?>
+            <span class="pill<?= $is_zstd ? ' highlight' : '' ?>"><?= htmlspecialchars($tag, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></span>
+          <?php endforeach; ?>
+        </div>
+      <?php else: ?>
+        <div class="card-value"><span class="muted" data-i18n="value_unavailable">Indisponible</span></div>
+      <?php endif; ?>
+      <div class="card-hint" data-i18n="http_accept_encoding_hint">Methodes de compression supportees par le navigateur.</div>
+      <?php if ($has_zstd): ?>
+        <div class="card-hint" data-i18n="encoding_zstd_hint">Le support de zstd est souvent actif sur Firefox, utile pour corroborer le navigateur.</div>
+      <?php endif; ?>
+    </div>
+  </div>
+
+  <div class="geo-card">
+    <div id="geo-details" class="geo-details hidden">
+      <div class="kv">
+        <span class="kv-label" data-i18n="geo_country_label">Pays</span>
+        <span id="geo-country" class="kv-value"></span>
+      </div>
+      <div class="kv">
+        <span class="kv-label" data-i18n="geo_org_label">Organisation</span>
+        <span id="geo-org" class="kv-value"></span>
+      </div>
+      <div class="kv">
+        <span class="kv-label" data-i18n="geo_net_label">Reseau</span>
+        <span id="geo-net" class="kv-value"></span>
+      </div>
+    </div>
+    <div id="geo-map" class="geo-map hidden">
+      <iframe id="geo-map-frame" title="OpenStreetMap" loading="lazy"></iframe>
+    </div>
+  </div>
+
+  <details class="accordion">
+    <summary data-i18n="server_section_summary">Afficher les détails HTTP (JSON)</summary>
+    <pre id="http"><?= htmlspecialchars(j($http), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></pre>
+  </details>
 
   <h2 data-i18n="js_section">Depuis JavaScript (côté navigateur)</h2>
-  <pre id="js">(collecte en cours…)</pre>
+  <details class="accordion">
+    <summary data-i18n="js_section_summary">Afficher les détails navigateur (JSON)</summary>
+    <pre id="js">(collecte en cours…)</pre>
+  </details>
 
 <script src="app.js"></script>
 </body>
