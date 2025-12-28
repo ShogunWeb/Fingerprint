@@ -103,6 +103,43 @@ function parse_accept_encoding(?string $header): array {
 }
 
 /**
+ * Reverse an IPv4 address for DNS-based Tor exit checks.
+ */
+function reverse_ipv4(?string $ip): ?string {
+  if (!$ip || !filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) return null;
+  return implode('.', array_reverse(explode('.', $ip)));
+}
+
+/**
+ * Check if the client IP is listed as a Tor exit for this server/port.
+ * Returns true/false when a DNS lookup is possible, null otherwise.
+ */
+function tor_exit_dns_check(?string $client_ip, ?string $server_ip, $server_port): ?bool {
+  $client_rev = reverse_ipv4($client_ip);
+  $server_rev = reverse_ipv4($server_ip);
+  $port = (int) $server_port;
+  if (!$client_rev || !$server_rev || $port <= 0) return null;
+
+  $host = $client_rev . '.' . $port . '.' . $server_rev . '.ip-port.exitlist.torproject.org';
+  if (function_exists('checkdnsrr')) {
+    return checkdnsrr($host, 'A');
+  }
+  if (function_exists('dns_get_record')) {
+    $records = dns_get_record($host, DNS_A);
+    return !empty($records);
+  }
+  return null;
+}
+
+/**
+ * Heuristic: detect explicit Tor Browser tokens in the User-Agent.
+ */
+function is_tor_browser_ua(?string $ua): bool {
+  if (!$ua) return false;
+  return (stripos($ua, 'TorBrowser') !== false) || (stripos($ua, 'Tor Browser') !== false);
+}
+
+/**
  * Lightweight user-agent parsing to extract browser and OS labels.
  */
 function parse_user_agent(?string $ua): array {
@@ -167,6 +204,22 @@ foreach ($encoding_tags as $tag) {
   }
 }
 
+// Proxy/VPN heuristic: presence of forwarding headers.
+$forward_headers = ['x-forwarded-for','x-real-ip','forwarded','via','cf-connecting-ip','true-client-ip','x-forwarded-proto','x-forwarded-port','x-remote-ip'];
+$forward_present = [];
+foreach ($forward_headers as $h) {
+  if (isset($headers_norm[$h]) && $headers_norm[$h] !== '') $forward_present[$h] = $headers_norm[$h];
+}
+$vpn_status = count($forward_present) > 0 ? 'maybe' : 'unknown';
+
+// Tor checks: DNS exit list + UA token heuristic.
+$server_ip = $_SERVER['SERVER_ADDR'] ?? null;
+$server_port = $_SERVER['SERVER_PORT'] ?? ($http['https'] ? 443 : 80);
+$tor_exit = tor_exit_dns_check($ip, $server_ip, $server_port);
+$tor_ua = is_tor_browser_ua($user_agent);
+$tor_status = ($tor_exit === true) ? 'yes' : ($tor_ua ? 'maybe' : 'unknown');
+$tor_dns_status = ($tor_exit === null) ? 'failed' : 'success';
+
 // Prevent caching so every reload reflects current request/client state.
 header('Cache-Control: no-store');
 ?><!doctype html>
@@ -196,6 +249,11 @@ header('Cache-Control: no-store');
     .kv { display: flex; gap: 8px; font-size: 13px; margin: 4px 0; }
     .kv-label { color: #666; min-width: 70px; }
     .muted { color: #888; font-weight: 400; }
+    .status-pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; border: 1px solid transparent; }
+    .status-yes { background: #fee2e2; color: #7f1d1d; border-color: #fecaca; }
+    .status-no { background: #dcfce7; color: #14532d; border-color: #bbf7d0; }
+    .status-unknown { background: #f3f4f6; color: #374151; border-color: #e5e7eb; }
+    .status-maybe { background: #fef3c7; color: #78350f; border-color: #fde68a; }
     .geo-card { background: #fff; border: 1px solid #e6e6e6; border-radius: 12px; padding: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.04); margin-bottom: 12px; }
     .geo-details { margin-top: 8px; }
     .geo-map { margin-top: 10px; border-radius: 12px; overflow: hidden; border: 1px solid #eee; }
@@ -290,6 +348,45 @@ header('Cache-Control: no-store');
       <div class="card-hint" data-i18n="http_accept_encoding_hint">Methodes de compression supportees par le navigateur.</div>
       <?php if ($has_zstd): ?>
         <div class="card-hint" data-i18n="encoding_zstd_hint">Le support de zstd est souvent actif sur Firefox, utile pour corroborer le navigateur.</div>
+      <?php endif; ?>
+    </div>
+
+    <div class="card">
+      <div class="card-title" data-i18n="http_vpn">VPN / Proxy</div>
+      <div class="card-value">
+        <span id="vpn-status" class="status-pill status-unknown" data-status="<?= htmlspecialchars($vpn_status, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>" data-i18n="vpn_unknown">Inconnu</span>
+      </div>
+      <div class="card-hint" data-i18n="vpn_hint">Heuristique basee sur des headers de transfert.</div>
+      <div class="card-hint">
+        <span data-i18n="vpn_headers_label">Headers detectes</span>:
+        <?php if ($forward_present): ?>
+          <span class="pills">
+            <?php foreach (array_keys($forward_present) as $h): ?>
+              <span class="pill"><?= htmlspecialchars($h, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></span>
+            <?php endforeach; ?>
+          </span>
+        <?php else: ?>
+          <span class="muted" data-i18n="vpn_headers_none">Aucun</span>
+        <?php endif; ?>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" data-i18n="http_tor">Tor</div>
+      <div class="card-value">
+        <span id="tor-status" class="status-pill status-unknown" data-status="<?= htmlspecialchars($tor_status, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>" data-i18n="tor_unknown">Inconnu</span>
+      </div>
+      <div class="card-hint" data-i18n="tor_hint">Sortie Tor via DNS + motif User-Agent explicite.</div>
+      <div class="card-hint">
+        <span data-i18n="tor_dns_label">Verification DNS</span>:
+        <?php if ($tor_dns_status === 'success'): ?>
+          <span data-i18n="tor_dns_success">reussie</span>
+        <?php else: ?>
+          <span data-i18n="tor_dns_failed">echouee</span>
+        <?php endif; ?>
+      </div>
+      <?php if ($tor_ua && $tor_exit !== true): ?>
+        <div class="card-hint" data-i18n="tor_ua_hint">User-Agent semblable a Tor Browser (heuristique).</div>
       <?php endif; ?>
     </div>
   </div>

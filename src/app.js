@@ -3,29 +3,47 @@ const i18n = {
   fr: {
     title: 'Informations visibles sur vous',
     lang_label: 'Langue',
-    note: 'Cette page affiche ce que le serveur reçoit via HTTP + ce que le navigateur expose via JavaScript. Rien n\u2019est \u201cpirate\u201d : ce sont des signaux standards. Certains champs peuvent etre masques par des protections (VPN, anti-fingerprint, etc.).',
-    server_section: 'Depuis la connexion HTTP (cote serveur)',
-    server_section_summary: 'Afficher les details HTTP (JSON)',
+    note: 'Cette page affiche ce que le serveur reçoit via HTTP + ce que le navigateur expose via JavaScript. Rien n\u2019est \u201cpiraté\u201d : ce sont des signaux standards. Certains champs peuvent être masqués par des protections (VPN, anti-fingerprint, etc.).',
+    server_section: 'Depuis la connexion HTTP (côté serveur)',
+    server_section_summary: 'Afficher les détails HTTP (JSON)',
     http_ip: 'IP',
     http_ip_hint: 'Adresse IP vue par le serveur.',
     http_accept_language: 'Accept-Language',
-    http_accept_language_hint: 'Codes de langue preferes declares par le navigateur.',
+    http_accept_language_hint: 'Codes de langue préférés déclarés par le navigateur.',
     http_user_agent: 'User-Agent',
     http_user_agent_hint: 'Extrait du User-Agent HTTP.',
     http_accept_encoding: 'Accept-Encoding',
-    http_accept_encoding_hint: 'Methodes de compression supportees par le navigateur.',
+    http_accept_encoding_hint: 'Méthodes de compression supportées par le navigateur.',
     encoding_zstd_hint: 'Le support de zstd est souvent actif sur Firefox, utile pour corroborer le navigateur.',
+    http_vpn: 'VPN / Proxy',
+    vpn_hint: 'Heuristique basée sur des headers de transfert.',
+    vpn_unknown: 'Inconnu',
+    vpn_detected: 'Détecté',
+    vpn_not_detected: 'Non détecté',
+    vpn_possible: 'Possible',
+    vpn_headers_label: 'Headers détectés',
+    vpn_headers_none: 'Aucun',
+    http_tor: 'Tor',
+    tor_hint: 'Sortie Tor via DNS + motif User-Agent explicite.',
+    tor_unknown: 'Inconnu',
+    tor_detected: 'Détecté',
+    tor_not_detected: 'Non détecté',
+    tor_possible: 'Possible',
+    tor_ua_hint: 'User-Agent semblable à Tor Browser (heuristique).',
+    tor_dns_label: 'Vérification DNS',
+    tor_dns_success: 'réussie',
+    tor_dns_failed: 'échouée',
     ua_browser_label: 'Navigateur',
     ua_os_label: 'OS',
     value_unavailable: 'Indisponible',
-    geo_button: 'Afficher la geolocalisation',
+    geo_button: 'Afficher la géolocalisation',
     geo_country_label: 'Pays',
     geo_org_label: 'Organisation',
-    geo_net_label: 'Reseau',
-    geo_loading: 'Requete en cours...',
-    geo_error: 'Impossible de recuperer les donnees de geolocalisation.',
-    js_section: 'Depuis JavaScript (cote navigateur)',
-    js_section_summary: 'Afficher les details navigateur (JSON)',
+    geo_net_label: 'Réseau',
+    geo_loading: 'Requête en cours...',
+    geo_error: 'Impossible de récupérer les données de géolocalisation.',
+    js_section: 'Depuis JavaScript (côté navigateur)',
+    js_section_summary: 'Afficher les détails navigateur (JSON)',
     collecting_placeholder: '(collecte en cours...)'
   },
   en: {
@@ -43,6 +61,24 @@ const i18n = {
     http_accept_encoding: 'Accept-Encoding',
     http_accept_encoding_hint: 'Compression methods supported by the browser.',
     encoding_zstd_hint: 'zstd support is often enabled in Firefox and can help corroborate the browser.',
+    http_vpn: 'VPN / Proxy',
+    vpn_hint: 'Heuristic based on forwarding headers.',
+    vpn_unknown: 'Unknown',
+    vpn_detected: 'Detected',
+    vpn_not_detected: 'Not detected',
+    vpn_possible: 'Possible',
+    vpn_headers_label: 'Detected headers',
+    vpn_headers_none: 'None',
+    http_tor: 'Tor',
+    tor_hint: 'Tor exit via DNS + explicit User-Agent token.',
+    tor_unknown: 'Unknown',
+    tor_detected: 'Detected',
+    tor_not_detected: 'Not detected',
+    tor_possible: 'Possible',
+    tor_ua_hint: 'User-Agent resembles Tor Browser (heuristic).',
+    tor_dns_label: 'DNS check',
+    tor_dns_success: 'success',
+    tor_dns_failed: 'failed',
     ua_browser_label: 'Browser',
     ua_os_label: 'OS',
     value_unavailable: 'Unavailable',
@@ -71,7 +107,9 @@ function applyTranslations(lang) {
   const dict = i18n[lang] || i18n.en;
   document.querySelectorAll('[data-i18n]').forEach((el) => {
     const key = el.getAttribute('data-i18n');
-    if (dict[key]) el.textContent = dict[key];
+    if (Object.prototype.hasOwnProperty.call(dict, key)) {
+      el.textContent = dict[key];
+    }
   });
   document.documentElement.lang = lang;
   localStorage.setItem('ui_lang', lang);
@@ -82,6 +120,8 @@ function applyTranslations(lang) {
   if (jsPre && !jsPre.dataset.collected) {
     jsPre.textContent = dict.collecting_placeholder;
   }
+
+  updateDetectionLabels(dict);
 }
 
 // WebGL renderer info can reveal GPU model and driver details.
@@ -209,6 +249,25 @@ function setText(id, value, fallback) {
   const el = document.getElementById(id);
   if (!el) return;
   el.textContent = value || fallback || '';
+}
+
+function updateDetectionLabels(dict) {
+  const vpn = document.getElementById('vpn-status');
+  const tor = document.getElementById('tor-status');
+  if (vpn) {
+    const state = vpn.dataset.status || 'unknown';
+    const key = state === 'yes' ? 'vpn_detected' : state === 'no' ? 'vpn_not_detected' : state === 'maybe' ? 'vpn_possible' : 'vpn_unknown';
+    vpn.textContent = dict[key];
+    vpn.classList.remove('status-yes', 'status-no', 'status-unknown', 'status-maybe');
+    vpn.classList.add(`status-${state}`);
+  }
+  if (tor) {
+    const state = tor.dataset.status || 'unknown';
+    const key = state === 'yes' ? 'tor_detected' : state === 'no' ? 'tor_not_detected' : state === 'maybe' ? 'tor_possible' : 'tor_unknown';
+    tor.textContent = dict[key];
+    tor.classList.remove('status-yes', 'status-no', 'status-unknown', 'status-maybe');
+    tor.classList.add(`status-${state}`);
+  }
 }
 
 // Build an OpenStreetMap embed URL centered on the IP location.
