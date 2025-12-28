@@ -21,6 +21,12 @@ function applyTranslations(lang) {
       el.textContent = dict[key];
     }
   });
+  const titleKey = lang === 'fr' ? 'titleFr' : 'titleEn';
+  const htmlEl = document.documentElement;
+  if (htmlEl) {
+    const title = htmlEl.dataset[titleKey];
+    if (title) document.title = title;
+  }
   document.documentElement.lang = lang;
   localStorage.setItem('ui_lang', lang);
   const select = document.getElementById('lang');

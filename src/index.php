@@ -4,6 +4,15 @@
 
 require_once __DIR__ . '/lib.php';
 
+/**
+ * Choose the page title based on browser language.
+ */
+function choose_page_title(): string {
+  $header = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '';
+  $lang = strtolower(substr(trim($header), 0, 2));
+  return ($lang === 'fr') ? 'Empreinte basique' : 'Basic fingerprinting';
+}
+
 // Collect request headers with a consistent, case-insensitive map.
 $headers = function_exists('getallheaders') ? getallheaders() : get_all_headers_fallback();
 $headers_norm = [];
@@ -82,10 +91,10 @@ $log_line = $log_ts . "\t" . $log_ip . "\t" . $log_ua . "\n";
 // Prevent caching so every reload reflects current request/client state.
 header('Cache-Control: no-store');
 ?><!doctype html>
-<html lang="fr">
+<html lang="fr" data-title-en="Basic fingerprinting" data-title-fr="Empreinte basique">
 <head>
   <meta charset="utf-8" />
-  <title>Infos visibles (HTTP / JS)</title>
+  <title><?= htmlspecialchars(choose_page_title(), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <link rel="stylesheet" href="styles.css" />
 </head>
